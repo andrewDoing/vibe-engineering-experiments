@@ -18,6 +18,8 @@ class GameModel(Base):
     # Store the full PGN to be able to reconstruct game history if needed
     pgn = Column(Text, default="") 
     turn = Column(String, default="white")
+    player_white_ai = Column(String, nullable=True)  # Name of the AI for white, if any
+    player_black_ai = Column(String, nullable=True)  # Name of the AI for black, if any
     is_checkmate = Column(Boolean, default=False)
     is_stalemate = Column(Boolean, default=False)
     is_insufficient_material = Column(Boolean, default=False)
@@ -35,4 +37,4 @@ def get_db():
 
 # Create tables if they don't exist (for simple setup without migrations initially)
 # For production, Alembic should be used.
-# Base.metadata.create_all(bind=engine) 
+# Base.metadata.create_all(bind=engine)
