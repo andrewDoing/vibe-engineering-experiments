@@ -5,10 +5,15 @@ from sqlalchemy.orm import Session
 
 from .game import Game
 from .database import SessionLocal, engine, GameModel, get_db # Updated imports
+from .ai_plugins import load_plugins, get_available_plugins # New imports for AI plugins
 
 # Base.metadata.create_all(bind=engine) # Alembic handles this
 
 app = FastAPI()
+
+@app.on_event("startup")
+async def startup_event():
+    load_plugins() # Load AI plugins on startup
 
 class NewGameResponse(BaseModel):
     game_id: UUID
@@ -166,6 +171,20 @@ async def submit_move(game_id: UUID, move_request: MoveRequest, db: Session = De
         message=message,
         game_state=current_game_state
     )
+
+# New endpoint to list available AI plugins
+class AIPluginInfo(BaseModel):
+    name: str
+    description: str
+
+@app.get("/ai-plugins", response_model=list[AIPluginInfo])
+async def list_ai_plugins():
+    plugins = get_available_plugins()
+    if not plugins:
+        # This case can be hit if load_plugins() hasn't found any or there was an issue.
+        # Depending on strictness, could raise HTTPException or return empty list with log.
+        print("No AI plugins loaded or available.")
+    return plugins
 
 @app.get("/")
 async def root():
