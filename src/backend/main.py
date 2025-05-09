@@ -2,14 +2,24 @@ from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from uuid import uuid4, UUID
 from sqlalchemy.orm import Session
+from fastapi.middleware.cors import CORSMiddleware # Add this import
 
 from .game import Game
 from .database import SessionLocal, engine, GameModel, get_db # Updated imports
-from .ai_plugins import load_plugins, get_available_plugins, get_plugin # New imports for AI plugins
+from .ai_plugins import load_plugins, get_available_plugins, get_plugin # Updated imports
 
 # Base.metadata.create_all(bind=engine) # Alembic handles this
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"], # Allows React dev server
+    allow_credentials=True,
+    allow_methods=["*"], # Allows all methods
+    allow_headers=["*"], # Allows all headers
+)
 
 @app.on_event("startup")
 async def startup_event():
@@ -22,7 +32,6 @@ class CreateGameRequest(BaseModel):
 class NewGameResponse(BaseModel):
     game_id: UUID
     board_fen: str
-    # Add other initial game state info if needed
     turn: str
     pgn: str
     player_white_ai: str | None = None
@@ -51,6 +60,17 @@ class GameStateResponse(BaseModel):
     is_fivefold_repetition: bool
     legal_moves: list[str]
 
+# New Pydantic model for AI plugin info
+class AIPluginInfo(BaseModel):
+    name: str
+    description: str
+
+# New endpoint to list available AI plugins
+@app.get("/ai/plugins", response_model=list[AIPluginInfo])
+async def list_ai_plugins():
+    plugins = get_available_plugins() # This returns list[dict[str, str]]
+    return [AIPluginInfo(name=p["name"], description=p["description"]) for p in plugins]
+
 
 @app.post("/games", response_model=NewGameResponse)
 async def create_game(request: CreateGameRequest, db: Session = Depends(get_db)):
@@ -65,7 +85,7 @@ async def create_game(request: CreateGameRequest, db: Session = Depends(get_db))
     new_db_game = GameModel(
         id=uuid4(), # Generate new UUID for the game
         board_fen=game_logic.get_board_fen(),
-        pgn="", # Initial PGN is empty
+        pgn=game_logic.get_pgn(), # Use PGN from Game class, includes headers
         turn="white", # Initial turn
         player_white_ai=request.player_white_ai,
         player_black_ai=request.player_black_ai
@@ -90,17 +110,11 @@ async def get_game_state(game_id: UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Game not found")
 
     # Reconstruct game logic to get legal moves, etc.
-    game_logic = Game()
-    game_logic.board.set_fen(db_game.board_fen)
-    # If PGN is stored and python-chess can load PGN to reconstruct history for legal moves:
-    # game_logic.board.reset()
-    # for move_san in db_game.pgn.split(): # This is a simplified PGN parsing
-    #     if "." in move_san: continue # Skip move numbers
-    #     try:
-    #         move = game_logic.board.parse_san(move_san)
-    #         game_logic.board.push(move)
-    #     except ValueError:
-    #         pass # Potentially log error if PGN is malformed
+    # Pass PGN string to Game constructor
+    game_logic = Game(board_fen=db_game.board_fen, pgn_str=db_game.pgn)
+    # The Game class's __init__ should handle setting up the board correctly.
+    # If board_fen in db is the source of truth for current position, ensure Game reflects that.
+    # game_logic.board.set_fen(db_game.board_fen) # This might be redundant if Game.__init__ is robust
 
     current_game_state = game_logic.get_game_state()
 
@@ -125,169 +139,187 @@ async def submit_move(game_id: UUID, move_request: MoveRequest, db: Session = De
     if not db_game:
         raise HTTPException(status_code=404, detail="Game not found")
 
-    game_logic = Game()
-    # Load current board state from DB FEN
-    game_logic.board.set_fen(db_game.board_fen)
-    # TODO: Consider loading full game history from PGN if needed for complex validation
-    # or if the Game class internally relies on full history.
-    # For now, FEN is sufficient for python-chess to validate next move.
+    # Initialize Game logic with current FEN and PGN from DB
+    game_logic = Game(board_fen=db_game.board_fen, pgn_str=db_game.pgn)
 
-    success, message = game_logic.make_move(move_request.uci_move)
+    # Make the human's move
+    human_move_success, human_move_message = game_logic.make_move(move_request.uci_move)
     
-    if not success:
-        raise HTTPException(status_code=400, detail=message)
+    if not human_move_success:
+        raise HTTPException(status_code=400, detail=human_move_message)
     
-    # Update DB record
-    db_game.board_fen = game_logic.get_board_fen()
-    # Update PGN - this is a simplified way; a proper PGN generator would be better
-    # For python-chess, you might need to build PGN move by move
-    # This requires the Game class to track moves or for us to parse the last move.
-    # For simplicity, let's assume the Game object can provide the last move in SAN
-    # or we append the UCI move. A proper PGN would include move numbers.
-    last_move_san = game_logic.board.peek().uci() # Gets the last move in UCI, convert to SAN if possible
-    try:
-        # Attempt to get SAN for PGN. This requires the board to be in the state *before* the move was made.
-        # This is tricky. For now, let's just append UCI, or better, have Game class manage PGN.
-        # A better approach: game_logic.get_last_move_san() if implemented
-        # Or, if game_logic.board.move_stack is not empty:
-        if game_logic.board.move_stack:
-            move_obj = game_logic.board.pop() # get the move
-            san_move = game_logic.board.san(move_obj) # get its SAN
-            game_logic.board.push(move_obj) # put it back
-            
-            if db_game.pgn:
-                db_game.pgn += f" {san_move}"
-            else:
-                db_game.pgn = san_move
-        else: # Fallback if stack is empty or SAN conversion fails
-             if db_game.pgn:
-                db_game.pgn += f" {move_request.uci_move}" # Fallback to UCI
-             else:
-                db_game.pgn = move_request.uci_move
-
-
-    except Exception: # Broad except for safety, ideally more specific
-        if db_game.pgn:
-            db_game.pgn += f" {move_request.uci_move}" # Fallback to UCI
-        else:
-            db_game.pgn = move_request.uci_move
-
-
-    current_game_state = game_logic.get_game_state()
-    db_game.turn = current_game_state["turn"]
-    db_game.is_checkmate = current_game_state["is_checkmate"]
-    db_game.is_stalemate = current_game_state["is_stalemate"]
-    db_game.is_insufficient_material = current_game_state["is_insufficient_material"]
-    db_game.is_seventyfive_moves = current_game_state["is_seventyfive_moves"]
-    db_game.is_fivefold_repetition = current_game_state["is_fivefold_repetition"]
+    # Update DB with the state after human's move
+    current_game_state_after_human = game_logic.get_game_state()
+    db_game.board_fen = current_game_state_after_human["board_fen"]
+    db_game.pgn = current_game_state_after_human["pgn"]
+    db_game.turn = current_game_state_after_human["turn"]
+    db_game.is_checkmate = current_game_state_after_human["is_checkmate"]
+    db_game.is_stalemate = current_game_state_after_human["is_stalemate"]
+    db_game.is_insufficient_material = current_game_state_after_human["is_insufficient_material"]
+    db_game.is_seventyfive_moves = current_game_state_after_human["is_seventyfive_moves"]
+    db_game.is_fivefold_repetition = current_game_state_after_human["is_fivefold_repetition"]
     
     db.commit()
     db.refresh(db_game)
+
+    # Now, check if AI needs to move
+    game_over_after_human = (
+        db_game.is_checkmate or 
+        db_game.is_stalemate or 
+        db_game.is_insufficient_material or 
+        db_game.is_seventyfive_moves or 
+        db_game.is_fivefold_repetition
+    )
+
+    final_game_state_for_response = current_game_state_after_human
+    ai_move_message_suffix = ""
+
+    if not game_over_after_human:
+        active_ai_name = None
+        if db_game.turn == "white" and db_game.player_white_ai:
+            active_ai_name = db_game.player_white_ai
+        elif db_game.turn == "black" and db_game.player_black_ai:
+            active_ai_name = db_game.player_black_ai
+        
+        if active_ai_name:
+            ai_plugin = get_plugin(active_ai_name)
+            if ai_plugin:
+                # AI uses the same game_logic instance, which has the updated board & PGN
+                ai_chess_move = ai_plugin.calculate_move(game_logic.board, game_id=str(game_id))
+
+                if ai_chess_move:
+                    ai_move_success, ai_move_message_from_logic = game_logic.make_move(ai_chess_move.uci())
+                    
+                    if ai_move_success:
+                        current_game_state_after_ai = game_logic.get_game_state()
+                        db_game.board_fen = current_game_state_after_ai["board_fen"]
+                        db_game.pgn = current_game_state_after_ai["pgn"]
+                        db_game.turn = current_game_state_after_ai["turn"]
+                        db_game.is_checkmate = current_game_state_after_ai["is_checkmate"]
+                        db_game.is_stalemate = current_game_state_after_ai["is_stalemate"]
+                        db_game.is_insufficient_material = current_game_state_after_ai["is_insufficient_material"]
+                        db_game.is_seventyfive_moves = current_game_state_after_ai["is_seventyfive_moves"]
+                        db_game.is_fivefold_repetition = current_game_state_after_ai["is_fivefold_repetition"]
+                        
+                        db.commit()
+                        db.refresh(db_game)
+                        final_game_state_for_response = current_game_state_after_ai
+                        ai_move_message_suffix = f" AI ({active_ai_name}) responded with {ai_chess_move.uci()}."
+                    else:
+                        print(f"AI ({active_ai_name}) failed to make a valid move {ai_chess_move.uci()}: {ai_move_message_from_logic}")
+                        ai_move_message_suffix = f" AI ({active_ai_name}) failed to move ({ai_chess_move.uci()}): {ai_move_message_from_logic}."
+                else:
+                    print(f"AI ({active_ai_name}) did not provide a move.")
+                    ai_move_message_suffix = f" AI ({active_ai_name}) provided no move."
+            else:
+                print(f"AI plugin '{active_ai_name}' not found during AI turn.")
+                ai_move_message_suffix = f" AI plugin '{active_ai_name}' not found."
     
     return MoveResponse(
         game_id=db_game.id,
-        board_fen=db_game.board_fen,
-        message=message,
-        game_state=current_game_state
+        board_fen=final_game_state_for_response["board_fen"],
+        message=human_move_message + ai_move_message_suffix,
+        game_state=final_game_state_for_response
     )
 
-# New endpoint to list available AI plugins
-class AIPluginInfo(BaseModel):
-    name: str
-    description: str
-
-@app.get("/ai-plugins", response_model=list[AIPluginInfo])
-async def list_ai_plugins():
-    plugins = get_available_plugins()
-    if not plugins:
-        # This case can be hit if load_plugins() hasn't found any or there was an issue.
-        # Depending on strictness, could raise HTTPException or return empty list with log.
-        print("No AI plugins loaded or available.")
-    return plugins
-
-@app.get("/")
-async def root():
-    return {"message": "Chess AI Backend"}
-
-@app.post("/games/{game_id}/ai-move", response_model=MoveResponse) # New endpoint for AI moves
-async def submit_ai_move(game_id: UUID, db: Session = Depends(get_db)):
+# Renamed from request_ai_move and removed trailing slash from path
+@app.post("/games/{game_id}/ai-move", response_model=MoveResponse)
+async def trigger_ai_move(game_id: UUID, db: Session = Depends(get_db)):
     db_game = db.query(GameModel).filter(GameModel.id == game_id).first()
     if not db_game:
         raise HTTPException(status_code=404, detail="Game not found")
 
-    game_logic = Game()
-    game_logic.board.set_fen(db_game.board_fen)
+    game_over = (
+        db_game.is_checkmate or db_game.is_stalemate or db_game.is_insufficient_material or
+        db_game.is_seventyfive_moves or db_game.is_fivefold_repetition
+    )
+    if game_over:
+        # Return current game state if game is over, instead of raising HTTP 400
+        # This allows frontend to fetch final state if it calls this endpoint unknowingly.
+        game_logic_for_state = Game(board_fen=db_game.board_fen, pgn_str=db_game.pgn)
+        current_state = game_logic_for_state.get_game_state()
+        return MoveResponse(
+            game_id=db_game.id,
+            board_fen=current_state["board_fen"],
+            message="Game is already over.",
+            game_state=current_state
+        )
 
-    current_turn_color = "white" if game_logic.board.turn == chess.WHITE else "black"
-    ai_plugin_name = None
-    if current_turn_color == "white" and db_game.player_white_ai:
-        ai_plugin_name = db_game.player_white_ai
-    elif current_turn_color == "black" and db_game.player_black_ai:
-        ai_plugin_name = db_game.player_black_ai
+    active_ai_name = None
+    if db_game.turn == "white" and db_game.player_white_ai:
+        active_ai_name = db_game.player_white_ai
+    elif db_game.turn == "black" and db_game.player_black_ai:
+        active_ai_name = db_game.player_black_ai
+    
+    if not active_ai_name:
+        # It's not an AI's turn. Return current state with a message.
+        game_logic_for_state = Game(board_fen=db_game.board_fen, pgn_str=db_game.pgn)
+        current_state = game_logic_for_state.get_game_state()
+        return MoveResponse(
+            game_id=db_game.id,
+            board_fen=current_state["board_fen"],
+            message="It's not an AI's turn or no AI is assigned to the current player.",
+            game_state=current_state
+        )
 
-    if not ai_plugin_name:
-        raise HTTPException(status_code=400, detail=f"No AI configured for the current player ({current_turn_color}) or it's not AI's turn.")
-
-    ai_plugin = get_plugin(ai_plugin_name)
+    ai_plugin = get_plugin(active_ai_name)
     if not ai_plugin:
-        # This should ideally not happen if validated at game creation, but good for robustness
-        raise HTTPException(status_code=500, detail=f"Configured AI plugin '{ai_plugin_name}' not found.")
+        # AI plugin not found. Return current state with an error message.
+        game_logic_for_state = Game(board_fen=db_game.board_fen, pgn_str=db_game.pgn)
+        current_state = game_logic_for_state.get_game_state()
+        return MoveResponse(
+            game_id=db_game.id,
+            board_fen=current_state["board_fen"],
+            message=f"AI plugin '{active_ai_name}' not found.",
+            game_state=current_state
+        )
 
-    # AI calculates the move
-    ai_chess_move = None
-    try:
-        # Potentially add a timeout mechanism here in the future if AI calls are long-running
-        ai_chess_move = ai_plugin.calculate_move(game_logic.board, game_id=str(db_game.id))
-    except Exception as e:
-        # Log the exception from the AI plugin
-        print(f"Error during AI ({ai_plugin_name}) move calculation for game {game_id}: {e}")
-        # Optionally, store this error state in the DB or notify admins
-        raise HTTPException(status_code=500, detail=f"AI plugin '{ai_plugin_name}' encountered an internal error: {str(e)}")
+    game_logic = Game(board_fen=db_game.board_fen, pgn_str=db_game.pgn)
+    ai_chess_move = ai_plugin.calculate_move(game_logic.board, game_id=str(game_id))
 
     if not ai_chess_move:
-        # This could mean AI resigns, or can't find a move (e.g. in checkmate/stalemate already, though board state should reflect that)
-        # Or an error in AI logic.
-        # For now, treat as if AI cannot make a move, which might be an error or game end.
-        # The game state itself (checkmate, stalemate) should be the source of truth for game end.
-        raise HTTPException(status_code=400, detail=f"AI '{ai_plugin_name}' did not provide a move. Game state: {game_logic.get_game_state()}")
+        current_state = game_logic.get_game_state()
+        return MoveResponse(
+            game_id=db_game.id,
+            board_fen=current_state["board_fen"],
+            message=f"AI ({active_ai_name}) did not provide a move.",
+            game_state=current_state
+        )
 
-    # Validate and apply the AI's move to the game logic
-    # The AI plugin should return a chess.Move object. We need its UCI string.
-    uci_move_str = ai_chess_move.uci()
-    success, message = game_logic.make_move(uci_move_str)
+    ai_move_success, ai_move_message_from_logic = game_logic.make_move(ai_chess_move.uci())
     
-    if not success:
-        # This would indicate an issue with the AI providing an illegal move, or a bug.
-        raise HTTPException(status_code=500, detail=f"AI '{ai_plugin_name}' provided an illegal move '{uci_move_str}'. Error: {message}. Board: {game_logic.board.fen()}")
-    
-    # Update DB record (similar to human move)
-    db_game.board_fen = game_logic.get_board_fen()
-    # PGN update logic (copied and adapted from human move, consider refactoring to a helper)
-    try:
-        if game_logic.board.move_stack:
-            move_obj = game_logic.board.pop() 
-            san_move = game_logic.board.san(move_obj) 
-            game_logic.board.push(move_obj) 
-            db_game.pgn = (db_game.pgn + f" {san_move}").lstrip()
-        else:
-            db_game.pgn = (db_game.pgn + f" {uci_move_str}").lstrip()
-    except Exception:
-        db_game.pgn = (db_game.pgn + f" {uci_move_str}").lstrip()
+    if not ai_move_success:
+        # AI proposed an invalid move. Return state before this attempt.
+        current_state_before_invalid_ai_move = Game(board_fen=db_game.board_fen, pgn_str=db_game.pgn).get_game_state()
+        return MoveResponse(
+            game_id=db_game.id,
+            board_fen=current_state_before_invalid_ai_move["board_fen"],
+            message=f"AI ({active_ai_name}) proposed an invalid move {ai_chess_move.uci()}: {ai_move_message_from_logic}",
+            game_state=current_state_before_invalid_ai_move
+        )
 
-    current_game_state_dict = game_logic.get_game_state()
-    db_game.turn = current_game_state_dict["turn"]
-    db_game.is_checkmate = current_game_state_dict["is_checkmate"]
-    db_game.is_stalemate = current_game_state_dict["is_stalemate"]
-    db_game.is_insufficient_material = current_game_state_dict["is_insufficient_material"]
-    db_game.is_seventyfive_moves = current_game_state_dict["is_seventyfive_moves"]
-    db_game.is_fivefold_repetition = current_game_state_dict["is_fivefold_repetition"]
+    current_game_state_after_ai = game_logic.get_game_state()
+    db_game.board_fen = current_game_state_after_ai["board_fen"]
+    db_game.pgn = current_game_state_after_ai["pgn"]
+    db_game.turn = current_game_state_after_ai["turn"]
+    db_game.is_checkmate = current_game_state_after_ai["is_checkmate"]
+    db_game.is_stalemate = current_game_state_after_ai["is_stalemate"]
+    db_game.is_insufficient_material = current_game_state_after_ai["is_insufficient_material"]
+    db_game.is_seventyfive_moves = current_game_state_after_ai["is_seventyfive_moves"]
+    db_game.is_fivefold_repetition = current_game_state_after_ai["is_fivefold_repetition"]
     
     db.commit()
     db.refresh(db_game)
     
     return MoveResponse(
         game_id=db_game.id,
-        board_fen=db_game.board_fen,
-        message=f"AI {ai_plugin_name} moved: {uci_move_str}. {message}",
-        game_state=current_game_state_dict
+        board_fen=current_game_state_after_ai["board_fen"],
+        message=f"AI ({active_ai_name}) moved {ai_chess_move.uci()}. {ai_move_message_from_logic}",
+        game_state=current_game_state_after_ai
     )
+
+# Endpoint to get available AI plugins (already defined above, just for context)
+# @app.get("/ai/plugins", response_model=list[AIPluginInfo])
+# async def list_ai_plugins():
+#     plugins = get_available_plugins()
+#     return [AIPluginInfo(name=p["name"], description=p["description"]) for p in plugins]

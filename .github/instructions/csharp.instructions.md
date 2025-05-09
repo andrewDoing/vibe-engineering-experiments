@@ -1,3 +1,6 @@
+---
+applyTo: "*.cs, *.csproj, *.sln, *.razor, *.cshtml"
+---
 # Use C# 12 features
 
 - Use Primary Constructor Syntax

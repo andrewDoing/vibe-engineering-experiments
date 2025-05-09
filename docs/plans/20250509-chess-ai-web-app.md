@@ -2,33 +2,33 @@
 
 ## Phase 1: Project Setup & Backend Core
 - [x] Task 1.1: Initialize project structure (`src` directory).
-- [ ] Task 1.2: Setup Python backend with FastAPI.
-- [ ] Task 1.3: Integrate `python-chess` for core chess logic (board representation, move validation, game state).
-- [ ] Task 1.4: Implement basic API endpoints for game creation and move submission.
-- [ ] Task 1.5: Setup SQLite for game persistence.
-- [ ] Task 1.6: Implement basic game persistence logic (save/load game state).
+- [x] Task 1.2: Setup Python backend with FastAPI.
+- [x] Task 1.3: Integrate `python-chess` for core chess logic (board representation, move validation, game state).
+- [x] Task 1.4: Implement basic API endpoints for game creation and move submission.
+- [x] Task 1.5: Setup SQLite for game persistence.
+- [x] Task 1.6: Implement basic game persistence logic (save/load game state).
 
 ## Phase 2: AI Integration - Backend
-- [ ] Task 2.1: Design and implement the AI plugin system architecture.
-- [ ] Task 2.2: Implement a simple rule-based Python AI (e.g., random move or basic heuristics).
-- [ ] Task 2.3: Integrate the simple Python AI into the plugin system.
-- [ ] Task 2.4: Implement an LLM-based AI (placeholder/mock integration initially).
-- [ ] Task 2.5: Integrate the LLM-based AI into the plugin system.
-- [ ] Task 2.6: Update API endpoints to allow AI selection for a game.
-- [ ] Task 2.7: Implement basic error handling for AI failures/timeouts in the backend.
+- [x] Task 2.1: Design and implement the AI plugin system architecture.
+- [x] Task 2.2: Implement a simple rule-based Python AI (e.g., random move or basic heuristics).
+- [x] Task 2.3: Integrate the simple Python AI into the plugin system.
+- [x] Task 2.4: Implement an LLM-based AI (placeholder/mock integration initially).
+- [x] Task 2.5: Integrate the LLM-based AI into the plugin system.
+- [x] Task 2.6: Update API endpoints to allow AI selection for a game.
+- [x] Task 2.7: Implement basic error handling for AI failures/timeouts in the backend.
 
 ## Phase 3: Frontend Development - React
-- [ ] Task 3.1: Setup React frontend application.
-- [ ] Task 3.2: Create a 2D chessboard component.
-- [ ] Task 3.3: Implement chessboard interactivity (e.g., drag and drop or click-to-move for pieces).
-- [ ] Task 3.4: Implement move input and highlighting.
-- [ ] Task 3.5: Connect frontend to backend APIs for game creation and move submission.
-- [ ] Task 3.6: Display game state from the backend.
+- [x] Task 3.1: Setup React frontend application.
+- [x] Task 3.2: Create a 2D chessboard component.
+- [x] Task 3.3: Implement chessboard interactivity (e.g., drag and drop or click-to-move for pieces).
+- [x] Task 3.4: Implement move input and highlighting.
+- [x] Task 3.5: Connect frontend to backend APIs for game creation and move submission.
+- [x] Task 3.6: Display game state from the backend.
 
 ## Phase 4: Core Gameplay Features
-- [ ] Task 4.1: Implement Human vs AI mode.
-  - [ ] Task 4.1.1: Allow user to select an AI opponent.
-  - [ ] Task 4.1.2: Enable user to make moves against the selected AI.
+- [x] Task 4.1: Implement Human vs AI mode.
+  - [x] Task 4.1.1: Allow user to select an AI opponent.
+  - [x] Task 4.1.2: Enable user to make moves against the selected AI.
 - [ ] Task 4.2: Implement AI vs AI mode.
   - [ ] Task 4.2.1: Allow user to select two AIs to play against each other.
   - [ ] Task 4.2.2: Display the AI vs AI match progressing automatically.
