@@ -6,10 +6,11 @@
     </notify>
 
     <edit_file>
-    At the end of ANY conversation and changes to files are made turn with me where you create or edit a file for me:
-
-    1. Stage all changes
-    2. Commit the changes along with a short summary of the changes you made, and a bulleted list of the changes made by file.
+    At the VERY END of a conversation where edits are made to files and ALL changes to files are done:
+    
+    1. Double check that you're done making changes
+    2. Stage all changes
+    3. Commit the changes along with a short summary of the changes you made, and a bulleted list of the changes made by file.
     </edit_file>
 
     <context>
