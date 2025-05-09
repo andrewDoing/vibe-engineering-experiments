@@ -17,9 +17,7 @@ applyTo: ".github/instructions/*.instructions.md"
   ```
 
 - **File References:**
-  - Use `[filename](path/to/filename)` to reference files
-  - Example: [prisma.instructions.md](prisma.instructions.md) for rule references
-  - Example: [schema.prisma](prisma/schema.prisma) for code references
+  - Use `[]()` to reference files, e.g., [csharp.instructions.md](csharp.instructions.md)
 
 - **Code Examples:**
   - Use language-specific code blocks

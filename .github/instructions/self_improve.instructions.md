@@ -38,7 +38,7 @@ applyTo: "**"
     where: { status: 'ACTIVE' }
   });
   
-  // Consider adding to [prisma.md](../.cursor/rules/prisma.md):
+  // Consider adding to [csharp.instructions.md](csharp.instructions.md):
   // - Standard select fields
   // - Common where conditions
   // - Performance optimization patterns

@@ -14,7 +14,6 @@ Task Master offers two primary ways to interact:
     - The MCP server exposes Task Master functionality through a set of tools (e.g., `get_tasks`, `add_subtask`).
     - This method offers better performance, structured data exchange, and richer error handling compared to CLI parsing.
     - Refer to [`mcp.json`](../../.vscode/mcp.json) for details on the MCP architecture and available tools.
-    - A comprehensive list and description of MCP tools and their corresponding CLI commands can be found in [`taskmaster.instructions.md`](taskmaster.instructions.md).
     - **Restart the MCP server** if core logic in `scripts/modules` or MCP tool/direct function definitions change.
 
 2.  **`task-master` CLI (For Users & Fallback)**:
@@ -22,36 +21,35 @@ Task Master offers two primary ways to interact:
     - It can also serve as a fallback if the MCP server is inaccessible or a specific function isn't exposed via MCP.
     - Install globally with `npm install -g task-master-ai` or use locally via `npx task-master-ai ...`.
     - The CLI commands often mirror the MCP tools (e.g., `task-master list` corresponds to `get_tasks`).
-    - Refer to [`taskmaster.instructions.md`](taskmaster.instructions.md) for a detailed command reference.
 
 ## Standard Development Workflow Process
 
-  - Start new projects by running `initialize_project` tool / `task-master init` or `parse_prd` / `task-master parse-prd --input='<prd-file.txt>'` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)) to generate initial tasks.json
-  - Begin coding sessions with `get_tasks` / `task-master list` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)) to see current tasks, status, and IDs
-  - Determine the next task to work on using `next_task` / `task-master next` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)).
-  - Analyze task complexity with `analyze_project_complexity` / `task-master analyze-complexity --research` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)) before breaking down tasks
-  - Review complexity report using `complexity_report` / `task-master complexity-report` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)).
+  - Start new projects by running `initialize_project` tool / `task-master init` or `parse_prd` / `task-master parse-prd --input='<prd-file.txt>'` to generate initial tasks.json
+  - Begin coding sessions with `get_tasks` / `task-master list` to see current tasks, status, and IDs
+  - Determine the next task to work on using `next_task` / `task-master next`.
+  - Analyze task complexity with `analyze_project_complexity` / `task-master analyze-complexity --research` before breaking down tasks
+  - Review complexity report using `complexity_report` / `task-master complexity-report`.
   - Select tasks based on dependencies (all marked 'done'), priority level, and ID order
   - Clarify tasks by checking task files in tasks/ directory or asking for user input
-  - View specific task details using `get_task` / `task-master show <id>` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)) to understand implementation requirements
-  - Break down complex tasks using `expand_task` / `task-master expand --id=<id> --force --research` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)) with appropriate flags like `--force` (to replace existing subtasks) and `--research`.
-  - Clear existing subtasks if needed using `clear_subtasks` / `task-master clear-subtasks --id=<id>` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)) before regenerating
+  - View specific task details using `get_task` / `task-master show <id>` to understand implementation requirements
+  - Break down complex tasks using `expand_task` / `task-master expand --id=<id> --force --research` with appropriate flags like `--force` (to replace existing subtasks) and `--research`.
+  - Clear existing subtasks if needed using `clear_subtasks` / `task-master clear-subtasks --id=<id>` before regenerating
 -   Implement code following task details, dependencies, and project standards
-  - Verify tasks according to test strategies before marking as complete (See [`tests.instructions.md`](tests.instructions.md))
-  - Mark completed tasks with `set_task_status` / `task-master set-status --id=<id> --status=done` (see [`taskmaster.instructions.md`](taskmaster.instructions.md))
-  - Update dependent tasks when implementation differs from original plan using `update` / `task-master update --from=<id> --prompt="..."` or `update_task` / `task-master update-task --id=<id> --prompt="..."` (see [`taskmaster.instructions.md`](taskmaster.instructions.md))
-  - Add new tasks discovered during implementation using `add_task` / `task-master add-task --prompt="..." --research` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)).
-  - Add new subtasks as needed using `add_subtask` / `task-master add-subtask --parent=<id> --title="..."` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)).
-  - Append notes or details to subtasks using `update_subtask` / `task-master update-subtask --id=<subtaskId> --prompt='Add implementation notes here...\nMore details...'` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)).
-  - Generate task files with `generate` / `task-master generate` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)) after updating tasks.json
-  - Maintain valid dependency structure with `add_dependency`/`remove_dependency` tools or `task-master add-dependency`/`remove-dependency` commands, `validate_dependencies` / `task-master validate-dependencies`, and `fix_dependencies` / `task-master fix-dependencies` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)) when needed
+  - Verify tasks according to test strategies before marking as complete
+  - Mark completed tasks with `set_task_status` / `task-master set-status --id=<id> --status=done`
+  - Update dependent tasks when implementation differs from original plan using `update` / `task-master update --from=<id> --prompt="..."` or `update_task` / `task-master update-task --id=<id> --prompt="..."`
+  - Add new tasks discovered during implementation using `add_task` / `task-master add-task --prompt="..." --research`.
+  - Add new subtasks as needed using `add_subtask` / `task-master add-subtask --parent=<id> --title="..."`.
+  - Append notes or details to subtasks using `update_subtask` / `task-master update-subtask --id=<subtaskId> --prompt='Add implementation notes here...\nMore details...'`.
+  - Generate task files with `generate` / `task-master generate` after updating tasks.json
+  - Maintain valid dependency structure with `add_dependency`/`remove_dependency` tools or `task-master add-dependency`/`remove-dependency` commands, `validate_dependencies` / `task-master validate-dependencies`, and `fix_dependencies` / `task-master fix-dependencies` when needed
 -   Respect dependency chains and task priorities when selecting work
 -   Report progress regularly using `get_tasks` / `task-master list`
 
 ## Task Complexity Analysis
 
-  - Run `analyze_project_complexity` / `task-master analyze-complexity --research` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)) for comprehensive analysis
-  - Review complexity report via `complexity_report` / `task-master complexity-report` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)) for a formatted, readable version.
+  - Run `analyze_project_complexity` / `task-master analyze-complexity --research` for comprehensive analysis
+  - Review complexity report via `complexity_report` / `task-master complexity-report` for a formatted, readable version.
 -   Focus on tasks with highest complexity scores (8-10) for detailed breakdown
 -   Use analysis results to determine appropriate subtask allocation
 -   Note that reports are automatically used by the `expand_task` tool/command
@@ -157,7 +155,7 @@ Taskmaster configuration is managed through two main mechanisms:
 Once a task has been broken down into subtasks using `expand_task` or similar methods, follow this iterative process for implementation:
 
 1.  **Understand the Goal (Preparation):**
-    *   Use `get_task` / `task-master show <subtaskId>` (see [`taskmaster.instructions.md`](taskmaster.instructions.md)) to thoroughly understand the specific goals and requirements of the subtask.
+    *   Use `get_task` / `task-master show <subtaskId>` to thoroughly understand the specific goals and requirements of the subtask.
 
 2.  **Initial Exploration & Planning (Iteration 1):**
     *   This is the first attempt at creating a concrete implementation plan.
