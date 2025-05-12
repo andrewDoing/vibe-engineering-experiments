@@ -61,7 +61,7 @@ function App() {
   useEffect(() => {
     const fetchAiPlugins = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/ai-plugins`);
+        const response = await fetch(`${API_BASE_URL}/ai/plugins`); // Corrected path
         if (!response.ok) {
           throw new Error(`Error fetching AI plugins: ${response.statusText}`);
         }
@@ -313,6 +313,7 @@ function App() {
           onMove={handleMove} 
           boardWidth={560} 
           squareStyles={squareStyles} 
+          arePiecesDraggable={!!gameId} // Conditionally enable piece dragging
         />
         <p>Status: {statusMessage}</p>
         {isAiThinking && <p><i>AI is thinking...</i></p>} {/* Show AI thinking message */}

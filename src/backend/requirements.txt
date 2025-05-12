@@ -1,1 +1,8 @@
 fastapi
+uvicorn[standard]
+sqlalchemy
+python-chess
+alembic
+pydantic
+# psycopg2-binary # If you switch to PostgreSQL
+# pysqlite3 # Usually built-in with Python, add if specific version needed

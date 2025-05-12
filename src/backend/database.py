@@ -3,8 +3,12 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime
+import os
 
-DATABASE_URL = "sqlite:///./chess_game.db"
+# Use absolute path for the database to avoid issues with working directory
+current_dir = os.path.dirname(os.path.abspath(__file__))
+database_path = os.path.join(current_dir, "chess_game.db")
+DATABASE_URL = f"sqlite:///{database_path}"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
